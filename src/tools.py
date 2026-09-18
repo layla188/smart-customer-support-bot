@@ -119,7 +119,8 @@ def get_exchange_rate(
 ) -> str:
     """
     Get the latest available exchange rate and convert
-    an amount from one currency to another.
+    an amount from one currency to another using
+    Frankfurter's live exchange-rate API.
     """
 
     if amount < 0:
@@ -130,8 +131,8 @@ def get_exchange_rate(
 
     if len(from_currency) != 3 or len(to_currency) != 3:
         return (
-            "Error: currencies must use 3-letter codes "
-            "such as USD or EUR."
+            "Error: currencies must use valid 3-letter "
+            "currency codes such as USD, EUR, or EGP."
         )
 
     if from_currency == to_currency:
@@ -140,52 +141,85 @@ def get_exchange_rate(
             f"{amount:.2f} {to_currency}"
         )
 
-    url = "https://api.frankfurter.app/latest"
+    url = (
+        f"https://api.frankfurter.dev/v2/rate/"
+        f"{from_currency.lower()}/"
+        f"{to_currency.lower()}"
+    )
 
     try:
 
         response = requests.get(
             url,
-            params={
-                "from": from_currency,
-                "to": to_currency,
+            timeout=15,
+            headers={
+                "User-Agent": "LumaAssist/1.0"
             },
-            timeout=10,
         )
 
         response.raise_for_status()
 
         data = response.json()
 
-        rates = data.get("rates", {})
+        rate = data.get("rate")
 
-        if to_currency not in rates:
+        if rate is None:
             return (
-                f"Exchange rate for {from_currency} "
-                f"to {to_currency} is not available."
+                f"I couldn't retrieve the exchange rate "
+                f"for {from_currency} to {to_currency}."
             )
 
-        rate = rates[to_currency]
+        rate = float(rate)
 
         converted_amount = amount * rate
 
+        date = data.get(
+            "date",
+            "latest available date",
+        )
+
         return (
-            f"Latest available rate: "
-            f"1 {from_currency} = {rate:.4f} {to_currency}\n"
+            f"Exchange rate date: {date}\n"
+            f"1 {from_currency} = "
+            f"{rate:.4f} {to_currency}\n"
             f"{amount:.2f} {from_currency} = "
             f"{converted_amount:.2f} {to_currency}"
         )
 
-    except requests.RequestException as e:
+    except requests.exceptions.Timeout:
 
         return (
-            f"Live exchange-rate service is unavailable: "
-            f"{str(e)}"
+            "The exchange-rate service took too long "
+            "to respond. Please try again."
         )
 
-    except (KeyError, TypeError, ValueError) as e:
+    except requests.exceptions.ConnectionError:
 
-        return f"Invalid exchange-rate response: {str(e)}"
+        return (
+            "The live exchange-rate service is currently "
+            "unreachable. Please try again shortly."
+        )
+
+    except requests.exceptions.HTTPError as error:
+
+        return (
+            "The exchange-rate service returned an error: "
+            f"{error}"
+        )
+
+    except requests.RequestException as error:
+
+        return (
+            "The live exchange-rate service is temporarily "
+            f"unavailable: {error}"
+        )
+
+    except (TypeError, ValueError, KeyError):
+
+        return (
+            "The exchange-rate service returned an "
+            "unexpected response."
+        )
 
 
 TOOLS = [
@@ -219,7 +253,7 @@ if __name__ == "__main__":
     print(
         get_exchange_rate(
             from_currency="USD",
-            to_currency="EUR",
-            amount=100,
+            to_currency="EGP",
+            amount=10,
         )
     )

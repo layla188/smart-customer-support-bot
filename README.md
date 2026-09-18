@@ -412,7 +412,7 @@ http://localhost:8501
 
 ---
 
-## 💬 Example Conversation
+## 💬 Demo conversation transcript
 
 ### Knowledge-Base Question
 
