@@ -196,9 +196,21 @@ class LumaAssistAgent:
 
             except Exception as e:
 
-                return (
-                    "Sorry, I couldn't connect to the "
-                    f"language model.\nError: {str(e)}"
+                error_text = str(e).lower()
+
+                if (
+                    "429" in error_text
+                    or "rate limit" in error_text
+                    or "free-models-per-day" in error_text
+                ):
+                    return (
+                     "LumaAssist has reached its current AI service usage limit. "
+                    "Please try again later."
+            )
+
+            return (
+                "LumaAssist is temporarily unable to process your request. "
+                "Please try again shortly."
                 )
 
 
