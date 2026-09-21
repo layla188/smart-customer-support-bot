@@ -1,3 +1,5 @@
+import traceback
+
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
@@ -16,6 +18,7 @@ You are LumaAssist, the customer-support assistant for LumaCart.
 LumaCart is a fictional e-commerce company based in Cairo, Egypt.
 
 Your job is to help customers with:
+
 - Products
 - Shipping
 - Returns
@@ -46,11 +49,11 @@ Follow these rules carefully:
    or order information.
 
 7. If the knowledge base does not contain the required
-   information, clearly say that additional assistance is
-   required.
+   information, clearly say that additional assistance
+   is required.
 
-8. Use previous conversation context when answering follow-up
-   questions.
+8. Use previous conversation context when answering
+   follow-up questions.
 
 9. Be polite, professional, and concise.
 
@@ -61,12 +64,9 @@ Follow these rules carefully:
 class LumaAssistAgent:
 
     def __init__(self):
-
         self.llm = create_llm()
-
         self.llm_with_tools = self.llm.bind_tools(TOOLS)
 
-      
         self.memory = ConversationMemory()
 
         self.tool_map = {
@@ -76,7 +76,6 @@ class LumaAssistAgent:
 
         # Safety limit to prevent infinite tool-calling loops
         self.max_iterations = 5
-
 
     def build_messages(self, user_input: str):
         """
@@ -98,7 +97,6 @@ class LumaAssistAgent:
         for message in self.memory.get_history():
 
             if message["role"] == "user":
-
                 messages.append(
                     HumanMessage(
                         content=message["content"]
@@ -106,7 +104,6 @@ class LumaAssistAgent:
                 )
 
             elif message["role"] == "assistant":
-
                 messages.append(
                     AIMessage(
                         content=message["content"]
@@ -122,36 +119,35 @@ class LumaAssistAgent:
 
         return messages
 
-
     def execute_tool(
         self,
         tool_name: str,
         tool_args: dict,
     ) -> str:
-      
 
         tool = self.tool_map.get(tool_name)
 
         # Unknown tool
         if tool is None:
-
             return (
                 f"Error: unknown tool '{tool_name}'."
             )
 
         try:
-
             # Execute the Python function
             result = tool(**tool_args)
 
             return str(result)
 
         except Exception as e:
+            print("\n========== TOOL ERROR ==========")
+            traceback.print_exc()
+            print("================================\n")
 
             return (
-                f"Tool '{tool_name}' failed: {str(e)}"
+                f"Tool '{tool_name}' failed:\n"
+                f"{type(e).__name__}: {str(e)}"
             )
-
 
     def chat(self, user_input: str) -> str:
         """
@@ -169,15 +165,12 @@ class LumaAssistAgent:
         user_input = user_input.strip()
 
         if not user_input:
-
             return "Please enter a question."
-
 
         # Build initial conversation
         messages = self.build_messages(
             user_input
         )
-
 
         # ====================================================
         # Tool Calling Loop
@@ -188,35 +181,23 @@ class LumaAssistAgent:
         ):
 
             try:
-
                 # Ask the LLM what to do
                 response = self.llm_with_tools.invoke(
                     messages
                 )
 
             except Exception as e:
+                print("\n========== LLM ERROR ==========")
+                traceback.print_exc()
+                print("================================\n")
 
-                error_text = str(e).lower()
-
-                if (
-                    "429" in error_text
-                    or "rate limit" in error_text
-                    or "free-models-per-day" in error_text
-                ):
-                    return (
-                     "LumaAssist has reached its current AI service usage limit. "
-                    "Please try again later."
-            )
-
-            return (
-                "LumaAssist is temporarily unable to process your request. "
-                "Please try again shortly."
+                return (
+                    "LumaAssist encountered an error:\n\n"
+                    f"`{type(e).__name__}: {str(e)}`"
                 )
-
 
             # Add LLM response to the current request
             messages.append(response)
-
 
             # =================================================
             # No Tool Call
@@ -228,9 +209,7 @@ class LumaAssistAgent:
 
                 # Make sure answer is a string
                 if not isinstance(answer, str):
-
                     answer = str(answer)
-
 
                 # Save conversation to memory
                 self.memory.add_user_message(
@@ -242,7 +221,6 @@ class LumaAssistAgent:
                 )
 
                 return answer
-
 
             # =================================================
             # Tool Calls
@@ -259,13 +237,11 @@ class LumaAssistAgent:
 
                 tool_call_id = tool_call["id"]
 
-
                 # Execute requested tool
                 tool_result = self.execute_tool(
                     tool_name=tool_name,
                     tool_args=tool_args,
                 )
-
 
                 # Add tool result back to the LLM conversation
                 messages.append(
@@ -274,7 +250,6 @@ class LumaAssistAgent:
                         tool_call_id=tool_call_id,
                     )
                 )
-
 
         # ====================================================
         # Maximum Iterations Reached
@@ -299,16 +274,15 @@ def main():
 
     print("\nType 'exit' to stop.\n")
 
-
     # Create agent
     agent = LumaAssistAgent()
-
 
     # Continuous conversation
     while True:
 
-        user_input = input("You: ").strip()
-
+        user_input = input(
+            "You: "
+        ).strip()
 
         # Exit commands
         if user_input.lower() in {
@@ -319,12 +293,10 @@ def main():
             print("\nGoodbye!")
             break
 
-
         # Get assistant response
         answer = agent.chat(
             user_input
         )
-
 
         print(
             f"\nLumaAssist: {answer}\n"
@@ -332,5 +304,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
